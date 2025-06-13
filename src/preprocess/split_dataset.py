@@ -7,11 +7,15 @@ from collections import defaultdict
 # 划分参数
 test_size = 0.2
 random_state = 42
+dataset_name = 'ustc2016_all'
+if dataset_name == 'ustc2016':
+    test_size =0.2
+
 # 处理所有 pcap 文件
-output_dir = "dataset/ustc2016_out/split_flows"
+output_dir = "dataset/{}/split_flows".format(dataset_name)
 # 创建目标目录
-os.makedirs("dataset/ustc2016_out/final_data/train", exist_ok=True)
-os.makedirs("dataset/ustc2016_out/final_data/test", exist_ok=True)
+os.makedirs("dataset/{}/final_data/train".format(dataset_name), exist_ok=True)
+os.makedirs("dataset/{}/final_data/test".format(dataset_name), exist_ok=True)
 
 for label in os.listdir(output_dir):
     label_dir = os.path.join(output_dir, label)
@@ -26,7 +30,7 @@ for label in os.listdir(output_dir):
     )
     
     # 复制训练集
-    train_label_dir = os.path.join("dataset/ustc2016_out/final_data/train", label)
+    train_label_dir = os.path.join("dataset/{}/final_data/train".format(dataset_name), label)
     os.makedirs(train_label_dir, exist_ok=True)
     for f in train_files:
         src = os.path.join(label_dir, f)
@@ -34,7 +38,7 @@ for label in os.listdir(output_dir):
         shutil.copy(src, dst)
     
     # 复制测试集
-    test_label_dir = os.path.join("dataset/ustc2016_out/final_data/test", label)
+    test_label_dir = os.path.join("dataset/{}/final_data/test".format(dataset_name), label)
     os.makedirs(test_label_dir, exist_ok=True)
     for f in test_files:
         src = os.path.join(label_dir, f)

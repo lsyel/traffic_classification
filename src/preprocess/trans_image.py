@@ -76,15 +76,15 @@ def flow_to_multichannel_image(flow_pcap_path, img_size=(32, 32)):
     return img.convert("RGB")
 
 
-
+dataset_name = 'ustc2016_all'
 # 处理所有流
 for split in ["train", "test"]:
-    split_dir = os.path.join("dataset/ustc2016_out/final_data", split)
+    split_dir = os.path.join("dataset/{}/final_data".format(dataset_name), split)
     for label in os.listdir(split_dir):
         label_dir = os.path.join(split_dir, label)
         for flow_file in os.listdir(label_dir):
             flow_path = os.path.join(label_dir, flow_file)
             # image = flow_to_image(flow_path)
             image = flow_to_multichannel_image(flow_path)
-            image.save(os.path.join(label_dir, f"{os.path.splitext(flow_file)[0]}.png"))
+            image.save(os.path.join(label_dir, f"{label}_{os.path.splitext(flow_file)[0]}.png"))
             os.remove(flow_path)  # 删除原始 pcap

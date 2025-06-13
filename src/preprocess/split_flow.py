@@ -6,7 +6,7 @@ from scapy.all import rdpcap, wrpcap
 from collections import defaultdict
 import os
 
-def split_pcap_by_flows(input_pcap, output_dir, label, max_flows_per_class=1000):
+def split_pcap_by_flows(input_pcap, output_dir, label, max_flows_per_class=2000):
     """将原始 pcap 按流分割为多个子 pcap，每个类别最多保留指定数量的流"""
     packets = rdpcap(input_pcap)
     flows = defaultdict(list)
@@ -48,10 +48,10 @@ def split_pcap_by_flows(input_pcap, output_dir, label, max_flows_per_class=1000)
         saved_count += 1
     
     print(f"✅ 类别 {label} 新增 {saved_count} 个流，总流数 {existing_flows + saved_count}/{max_flows_per_class}")
-
+dataset_name = 'ustc2016_all'
 # 处理所有 pcap 文件
-input_dir = "dataset/ustc2016_out/raw_data"
-output_dir = "dataset/ustc2016_out/split_flows"
+input_dir = "dataset/{}/raw_data".format(dataset_name)
+output_dir = "dataset/{}/split_flows".format(dataset_name)
 
 for filename in os.listdir(input_dir):
     if filename.endswith(".pcap"):

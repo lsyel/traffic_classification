@@ -23,6 +23,7 @@ model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../model")
 
 sys.path.append(model_path)
 from densenet import DenseNetBC100
+from resnet import ResNet34
 
 # ---- 新增1：数据预处理增强 ----
 transform = transforms.Compose([
@@ -52,14 +53,16 @@ def create_balanced_loader(dataset, batch_size):
         pin_memory=True,
         persistent_workers=True
     )
-train_dataset = ImageFolder("dataset/ustc2016/final_data/train", transform=transform)
-test_dataset = ImageFolder("dataset/ustc2016/final_data/test", transform=transform)
+dataset ='ustc2016_all'
+train_dataset = ImageFolder(f"dataset/{dataset}/final_data/train", transform=transform)
+test_dataset = ImageFolder(f"dataset/{dataset}/final_data/test", transform=transform)
 
 train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=128)
 
 # 初始化模型
-model = DenseNetBC100(num_c=len(train_dataset.classes))
+# model = DenseNetBC100(num_c=len(train_dataset.classes))
+model = ResNet34(num_c=len(train_dataset.classes))
 scaler = GradScaler()  # 混合精度缩放器
 
 
@@ -92,7 +95,7 @@ patience_counter = 0
 
 # 早停参数
 best_val_acc = 0.0
-patience = 20
+patience = 10
 no_improve_epochs = 0
 num_epochs = 10
 
@@ -100,7 +103,7 @@ from tqdm import tqdm
 import time
 
 # 训练参数
-num_epochs = 100
+num_epochs = 50
 best_val_acc = 0.0
 
 for epoch in range(num_epochs):
@@ -141,7 +144,7 @@ for epoch in range(num_epochs):
     if val_acc > best_val_acc:
         best_val_acc = val_acc
         patience_counter = 0
-        torch.save(model.state_dict(), "best_model.pth")
+        torch.save(model.state_dict(), f"best_model_{dataset}_{val_acc}.pth")
         print(f"🏆 最佳模型保存，准确率: {val_acc:.2f}%")
     else:
         patience_counter += 1
