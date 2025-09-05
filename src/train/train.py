@@ -53,7 +53,7 @@ def create_balanced_loader(dataset, batch_size):
         pin_memory=True,
         persistent_workers=True
     )
-dataset ='ustc2016_all'
+dataset ='ustc2016'
 train_dataset = ImageFolder(f"dataset/{dataset}/final_data/train", transform=transform)
 test_dataset = ImageFolder(f"dataset/{dataset}/final_data/test", transform=transform)
 
@@ -89,131 +89,137 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     verbose=True
 )
 
-# ---- 修改5：增强的训练循环 ----
-best_val_acc = 0.0
-patience_counter = 0
 
-# 早停参数
-best_val_acc = 0.0
-patience = 10
-no_improve_epochs = 0
-num_epochs = 10
 
-from tqdm import tqdm
-import time
+def train():
+        # ---- 修改5：增强的训练循环 ----
+    best_val_acc = 0.0
+    patience_counter = 0
 
-# 训练参数
-num_epochs = 50
-best_val_acc = 0.0
+    # 早停参数
+    best_val_acc = 0.0
+    patience = 10
+    no_improve_epochs = 0
+    num_epochs = 10
 
-for epoch in range(num_epochs):
-    model.train()
-    epoch_loss = 0.0
-    start_time = time.time()
-    
-    # 训练阶段（混合精度）
-    for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
-        inputs, labels = inputs.to(device), labels.to(device)
+    from tqdm import tqdm
+    import time
+
+    # 训练参数
+    num_epochs = 50
+    best_val_acc = 0.0
+    for epoch in range(num_epochs):
+        model.train()
+        epoch_loss = 0.0
+        start_time = time.time()
         
-        optimizer.zero_grad()
+        # 训练阶段（混合精度）
+        for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
+            inputs, labels = inputs.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+            
+            with autocast():  # 混合精度前向
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+            
+            scaler.scale(loss).backward()  # 缩放梯度
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
+            scaler.step(optimizer)
+            scaler.update()
+            
+            epoch_loss += loss.item()
         
-        with autocast():  # 混合精度前向
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+        # 验证阶段
+        model.eval()
+        correct = 0
+        with torch.no_grad():
+            for inputs, labels in test_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                correct += (outputs.argmax(1) == labels).sum().item()
         
-        scaler.scale(loss).backward()  # 缩放梯度
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
-        scaler.step(optimizer)
-        scaler.update()
+        val_acc = 100 * correct / len(test_dataset)
+        scheduler.step(val_acc)  # 动态调整学习率
         
-        epoch_loss += loss.item()
-    
-    # 验证阶段
+        # 早停机制
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            patience_counter = 0
+            torch.save(model.state_dict(), f"best_model_{dataset}.pth")
+            print(f"🏆 最佳模型保存，准确率: {val_acc:.2f}%")
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print("🛑 早停触发")
+                break
+        
+        # 打印统计信息
+        epoch_time = time.time() - start_time
+        print(f"Epoch {epoch+1}/{num_epochs} | "
+            f"Time: {epoch_time:.1f}s | "
+            f"Loss: {epoch_loss/len(train_loader):.4f} | "
+            f"Val Acc: {val_acc:.2f}% | "
+            f"LR: {optimizer.param_groups[0]['lr']:.1e}")
+
+    print("Training complete!")
+    model.load_state_dict(torch.load(f"best_model_{dataset}.pth"))
     model.eval()
-    correct = 0
+def eval():
+    import torch
+    from sklearn.metrics import classification_report, confusion_matrix
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    from tqdm import tqdm
+
+    # 混淆矩阵可视化
+    def plot_confusion_matrix(labels, preds, classes):
+        cm = confusion_matrix(labels, preds)
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
+                    xticklabels=classes, yticklabels=classes)
+        plt.xlabel("预测标签")
+        plt.ylabel("真实标签")
+        plt.title("混淆矩阵")
+        plt.savefig("confusion_matrix.png")  # 保存图片
+        plt.close()
+    # 加载最佳模型
+    model.load_state_dict(torch.load(f"best_model_{dataset}.pth"))
+    model.eval()
+
+    # 初始化存储变量
+    all_labels = []
+    all_preds = []
+
+    # 测试集评估
     with torch.no_grad():
-        for inputs, labels in test_loader:
+        for inputs, labels in tqdm(test_loader, desc="测试中"):
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            correct += (outputs.argmax(1) == labels).sum().item()
-    
-    val_acc = 100 * correct / len(test_dataset)
-    scheduler.step(val_acc)  # 动态调整学习率
-    
-    # 早停机制
-    if val_acc > best_val_acc:
-        best_val_acc = val_acc
-        patience_counter = 0
-        torch.save(model.state_dict(), f"best_model_{dataset}_{val_acc}.pth")
-        print(f"🏆 最佳模型保存，准确率: {val_acc:.2f}%")
-    else:
-        patience_counter += 1
-        if patience_counter >= patience:
-            print("🛑 早停触发")
-            break
-    
-    # 打印统计信息
-    epoch_time = time.time() - start_time
-    print(f"Epoch {epoch+1}/{num_epochs} | "
-          f"Time: {epoch_time:.1f}s | "
-          f"Loss: {epoch_loss/len(train_loader):.4f} | "
-          f"Val Acc: {val_acc:.2f}% | "
-          f"LR: {optimizer.param_groups[0]['lr']:.1e}")
+            preds = outputs.argmax(dim=1)
+            
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
 
-print("Training complete!")
-model.load_state_dict(torch.load("best_model.pth"))
-model.eval()
+    # 计算指标
+    accuracy = 100 * np.mean(np.array(all_preds) == np.array(all_labels))
+    print(f"\n🏁 最终测试准确率: {accuracy:.2f}%")
 
-import torch
-from sklearn.metrics import classification_report, confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-from tqdm import tqdm
+    # 分类报告（精确率/召回率/F1）
+    print("\n📊 分类报告:")
+    print(classification_report(
+        all_labels, all_preds, 
+        target_names=test_dataset.classes,  # 替换为你的类别名称列表
+        digits=4
+    ))
 
-# 加载最佳模型
-model.load_state_dict(torch.load("best_model.pth"))
-model.eval()
 
-# 初始化存储变量
-all_labels = []
-all_preds = []
-
-# 测试集评估
-with torch.no_grad():
-    for inputs, labels in tqdm(test_loader, desc="测试中"):
-        inputs, labels = inputs.to(device), labels.to(device)
-        outputs = model(inputs)
-        preds = outputs.argmax(dim=1)
-        
-        all_labels.extend(labels.cpu().numpy())
-        all_preds.extend(preds.cpu().numpy())
-
-# 计算指标
-accuracy = 100 * np.mean(np.array(all_preds) == np.array(all_labels))
-print(f"\n🏁 最终测试准确率: {accuracy:.2f}%")
-
-# 分类报告（精确率/召回率/F1）
-print("\n📊 分类报告:")
-print(classification_report(
-    all_labels, all_preds, 
-    target_names=test_dataset.classes,  # 替换为你的类别名称列表
-    digits=4
-))
-
-# 混淆矩阵可视化
-def plot_confusion_matrix(labels, preds, classes):
-    cm = confusion_matrix(labels, preds)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
-                xticklabels=classes, yticklabels=classes)
-    plt.xlabel("预测标签")
-    plt.ylabel("真实标签")
-    plt.title("混淆矩阵")
-    plt.savefig("confusion_matrix.png")  # 保存图片
-    plt.close()
-#混淆矩阵输出
-print("\n📊 混淆矩阵:")
-print(confusion_matrix(all_labels, all_preds))
-
-# plot_confusion_matrix(all_labels, all_preds, test_dataset.classes)
+    #混淆矩阵输出
+    print("\n📊 混淆矩阵:")
+    print(confusion_matrix(all_labels, all_preds))
+    #矩阵可视化
+    plot_confusion_matrix(all_labels, all_preds, test_dataset.classes)
+if __name__ == '__main__':
+    train()
+    eval()
