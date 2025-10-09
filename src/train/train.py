@@ -31,32 +31,29 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
-# ---- 修改2：带平衡采样的DataLoader ----
-def create_balanced_loader(dataset, batch_size):
-    # 计算类别权重
-    class_counts = np.bincount(dataset.targets)
-    class_weights = 1. / class_counts
-    weights = class_weights[dataset.targets]
-    
-    # 创建带权重的采样器
-    sampler = WeightedRandomSampler(
-        weights, 
-        num_samples=len(weights), 
-        replacement=True
-    )
-    
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        sampler=sampler,
-        num_workers=4,
-        pin_memory=True,
-        persistent_workers=True
-    )
 dataset ='ustc2016'
-train_dataset = ImageFolder(f"dataset/{dataset}/final_data/train", transform=transform)
-test_dataset = ImageFolder(f"dataset/{dataset}/final_data/test", transform=transform)
+train_dataset = ImageFolder(f"/root/wzhdesign/traffic_classification/dataset/{dataset}/final_data/train", transform=transform)
+test_dataset = ImageFolder(f"/root/wzhdesign/traffic_classification/dataset/{dataset}/final_data/test", transform=transform)
+# 打印类别标签对应关系
+print("\n=== 类别标签对应关系 ===")
+print(f"训练集类别数量: {len(train_dataset.classes)}")
+print("标签索引 -> 类别名称:")
+for i, class_name in enumerate(train_dataset.classes):
+    print(f"{i} -> {class_name}")
 
+# 确保测试集类别顺序相同
+print("\n测试集类别顺序验证:")
+print(f"测试集类别数量: {len(test_dataset.classes)}")
+for i, class_name in enumerate(test_dataset.classes):
+    print(f"{i} -> {class_name}")
+
+# 检查训练集和测试集类别是否一致
+if train_dataset.classes != test_dataset.classes:
+    print("\n⚠️ 警告: 训练集和测试集的类别顺序不一致！")
+    print("训练集类别:", train_dataset.classes)
+    print("测试集类别:", test_dataset.classes)
+else:
+    print("\n✅ 训练集和测试集类别顺序一致")
 train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=128)
 
