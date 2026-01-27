@@ -1,3 +1,4 @@
+import time
 from scapy.all import rdpcap
 from PIL import Image
 import numpy as np
@@ -78,6 +79,8 @@ def flow_to_multichannel_image(flow_pcap_path, img_size=(32, 32)):
 
 dataset_name = 'ustc2016'
 # 处理所有流
+start_time = time.time()
+image_count = 0
 for split in ["train", "test"]:
     split_dir = os.path.join("/root/wzhdesign/traffic_classification/dataset/{}/final_data".format(dataset_name), split)
     for label in os.listdir(split_dir):
@@ -88,3 +91,11 @@ for split in ["train", "test"]:
             image = flow_to_multichannel_image(flow_path)
             image.save(os.path.join(label_dir, f"{label}_{os.path.splitext(flow_file)[0]}.png"))
             os.remove(flow_path)  # 删除原始 pcap
+            image_count += 1
+end_time = time.time()
+avg_time = (end_time - start_time) / image_count
+print("转换完成，耗时: {} 秒".format(end_time - start_time))
+print("转换完成，共生成 {} 张图像".format(image_count))
+print("平均每张图像耗时: {} 秒".format(avg_time))
+
+

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import shutil
 import os
-from scapy.all import rdpcap, wrpcap
+from scapy.all import rdpcap, wrpcap    
 from collections import defaultdict
 # 划分参数
 test_size = 0.2

@@ -72,7 +72,7 @@ model = model.to(device)
 
 optimizer = optim.AdamW(  # 改用AdamW
     model.parameters(),
-    lr=0.001,
+    lr=0.0001,
     weight_decay=0.01     # 增强正则化
 )
 criterion = nn.CrossEntropyLoss()

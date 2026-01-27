@@ -54,7 +54,7 @@ input_dir = "/root/wzhdesign/traffic_classification/dataset/{}/raw_data".format(
 output_dir = "/root/wzhdesign/traffic_classification/dataset/{}/split_flows".format(dataset_name)
 
 for filename in os.listdir(input_dir):
-    if filename.endswith(".pcap"):
+    if filename.endswith(".pcap") or filename.endswith(".pcapng"):
         label = os.path.splitext(filename)[0]  # 从文件名获取类别
         split_pcap_by_flows(
             os.path.join(input_dir, filename),
